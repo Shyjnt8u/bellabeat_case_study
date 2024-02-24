@@ -1,0 +1,339 @@
+---
+title: "Bellabeat Case Study"
+author: "Sierra Paul"
+date created: 02/21/24
+output: html_document
+---
+
+![](https://thegadgetflow.com/wp-content/uploads/2019/09/Bellabeat-Leaf-Urban-Health-Tracking-Jewelry-001.jpg)
+
+# **Case Study Background Information**
+
+### **Data set used:** [FitBit Fitness Tracker Data](https://www.kaggle.com/datasets/arashnic/fitbit)
+
+### Uploaded by: [Möbius](https://www.kaggle.com/arashnic)  
+License: CC0:Public Domain
+
+# **About the company**
+
+Urška Sršen and Sando Mur founded Bellabeat, a high-tech company that manufactures health-focused smart products.Sršen used her background as an artist to develop beautifully designed technology that informs and inspires women around the world. Collecting data on activity, sleep, stress, and reproductive health has allowed Bellabeat to empower women with knowledge about their own health and habits. Since it was founded in 2013, Bellabeat has grown rapidly and quickly positioned itself as a tech-driven wellness company for women.
+
+# **Business Task:**
+
+Analyze smart device usage data and apply the insights in order to inform Bellabeat’s marketing strategy.
+
+### Desired insights
+
+-   What are some trends in smart device usage?
+-   How could these trends apply to Bellabeat customers?
+-   How could these trends influence Bellabeat marketing strategy?
+
+## Download needed packages
+
+```{r warning=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(lubridate)
+library(dplyr)
+library(tidyr)
+library(janitor)
+```
+
+## Read in the files with daily data to be worked with, preview them, and get basic metrics of the data
+
+```{r warning=FALSE}
+# read in the tables 
+activity <- read_csv("Bellabeat_data/dailyActivity_merged.csv")
+sleep <- read_csv("Bellabeat_data/sleepDay_merged.csv")
+steps <- read_csv("Bellabeat_data/dailySteps_merged.csv")
+intensities <- read_csv("Bellabeat_data/dailyIntensities_merged.csv")
+calories <- read_csv("Bellabeat_data/dailyCalories_merged.csv")
+weight <- read_csv("Bellabeat_data/weightLogInfo_merged.csv")
+hourly_steps <- read_csv("Bellabeat_data/hourlySteps_merged.csv")
+hourly_intensities <- read_csv("Bellabeat_data/hourlyIntensities_merged.csv")
+
+```
+
+### preview tables
+
+```{r warning=FALSE}
+glimpse(activity)
+glimpse(sleep)
+glimpse(steps)
+glimpse(intensities)
+glimpse(calories)
+glimpse(weight)
+glimpse(hourly_intensities)
+glimpse(hourly_steps)
+```
+
+### Id count for all tables
+
+```{r}
+n_distinct(activity$Id)
+n_distinct(calories$Id)
+n_distinct(intensities$Id)
+n_distinct(sleep$Id)
+n_distinct(weight$Id)
+n_distinct(hourly_intensities$Id)
+n_distinct(hourly_steps$Id)
+```
+
+### Check for duplicates
+
+```{r}
+sum(duplicated(activity))
+sum(duplicated(sleep))
+sum(duplicated(intensities))
+sum(duplicated(steps))
+sum(duplicated(calories))
+sum(duplicated(weight))
+sum(duplicated(hourly_intensities))
+sum(duplicated(hourly_steps))
+```
+
+### Get rid of duplicates in "sleep"
+
+```{r}
+sleep <- sleep %>% 
+  distinct() %>% 
+  drop_na()
+```
+
+### Ensure the duplicates were removed successfully
+
+```{r}
+sum(duplicated(sleep))
+```
+
+## Data limitations
+
+-   This data does not have gender as a collected variable. This will make it more difficult to make specifically women-based recommendations.\
+-   This data was collected over a period of only one month, in 2016.
+-   While most of the tables have 33 participants, sleep has only 24, and weight has only 8 participants. Although 8 participants isn't enough to make reasonable predictions, weight is obviously a feature that most participants chose not to use, which is revealing in it's own right.
+
+# **Before analyzing:**
+
+Correct the date format:
+
+```{r warning=FALSE}
+# intensities table
+intensities$ActivityDay=as.POSIXct(intensities$ActivityDay, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+intensities$date <- format(intensities$ActivityDay, format = "%m/%d/%y") 
+
+# activity table
+activity$ActivityDate=as.POSIXct(activity$ActivityDate, format="%m/%d/%Y", tz=Sys.timezone())
+activity$date <- format(activity$ActivityDate, format = "%m/%d/%y")
+
+# sleep table
+sleep$SleepDay=as.POSIXct(sleep$SleepDay, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+sleep$date <- format(sleep$SleepDay, format = "%m/%d/%y")
+
+# weight table
+weight$Date=as.POSIXct(weight$Date, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+weight$date <- format(weight$Date, format = "%m/%d/%y %h:%M:%S %p")
+
+# calories table
+calories$ActivityDay=as.POSIXct(calories$ActivityDay, format="%m/%d/%Y", tz=Sys.timezone())
+calories$date <- format(calories$ActivityDay, format = "%m/%d/%y")
+
+# hourly steps table
+hourly_steps$ActivityHour=as.POSIXct(hourly_steps$ActivityHour, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+sleep$date <- format(sleep$SleepDay, format = "%m/%d/%y %h:%M:%S %p")
+
+# hourly intensities table
+hourly_intensities$ActivityHour=as.POSIXct(hourly_steps$ActivityHour, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+sleep$date <- format(sleep$SleepDay, format = "%m/%d/%y %h:%M:%S %p")
+
+```
+
+Clean column names:
+
+```{r warning=FALSE}
+activity <- activity %>% 
+  clean_names() %>% 
+  rename_with(tolower)
+
+sleep <- sleep %>% 
+  clean_names() %>% 
+  rename_with(tolower)
+
+intensities <- intensities %>% 
+  clean_names() %>% 
+  rename_with(tolower)
+
+steps <- steps %>% 
+  clean_names() %>% 
+  rename_with(tolower)
+
+weight <- weight %>% 
+  clean_names() %>% 
+  rename_with(tolower)
+
+calories <- calories %>% 
+  clean_names() %>% 
+  rename_with(tolower)
+
+hourly_steps <- hourly_steps %>% 
+  clean_names() %>% 
+  rename_with(tolower)
+
+hourly_intensities <- hourly_intensities %>% 
+  clean_names() %>% 
+  rename_with(tolower)
+```
+
+Create a new column in my activity table that is the total daily active minutes:
+
+```{r warning=FALSE}
+# first I make a data frame using the data I need for the new column
+active_minutes <- data.frame(activity$very_active_minutes, 
++                             activity$fairly_active_minutes, 
++                             activity$lightly_active_minutes)
+
+# make new column out of row sums of the new data frame
+activity$total_active_minutes <- rowSums(active_minutes)
+```
+
+Create a new column in the sleep table for the time spent awake in bed:
+
+```{r warning=FALSE}
+sleep$total_waketime_in_bed <- (sleep$total_time_in_bed - sleep$total_minutes_asleep)
+```
+
+Create a new column using only the hours for the hourly tables
+
+```{r warning=FALSE}
+hourly_steps$hour <- format(as.POSIXct(hourly_steps$activity_hour), format = "%H")
+
+hourly_intensities$hour <- format(as.POSIXct(hourly_intensities$activity_hour), format = "%H")
+```
+
+# Next, I get summarized statistics for my datasets
+
+```{r warning=FALSE}
+# activity table summary
+activity %>%  
+  select(total_steps,
+         total_distance,
+         sedentary_minutes, total_active_minutes) %>%
+  summary()
+
+# active minutes per category
+activity %>%
+  select(very_active_minutes, fairly_active_minutes, lightly_active_minutes) %>%
+  summary()
+
+# sleep
+sleep %>%
+  select(total_sleep_records, total_minutes_asleep, total_time_in_bed, total_waketime_in_bed) %>%
+  summary()
+
+# weight
+weight %>% 
+  select(weight_pounds,bmi) %>% 
+  summary()
+
+# calories
+calories %>% 
+  select(calories) %>% 
+  summary()
+
+# hourly steps
+hourly_steps %>% 
+  select(step_total) %>% 
+  summary()
+
+# hourly intensities
+hourly_intensities %>% 
+  select(average_intensity, total_intensity) %>% 
+  summary()
+```
+
+# **Insights from first glance at data tables**
+
+-   On average, participants were sedentary 991.2 minutes per day, and an average of 46.27% of that being spent in bed.
+-   This data does not have gender as a collected variable. This will make it more difficult to make specifically women-based recommendations(especially prevalent with weight and calories). So I will focus on the activity, sleep, steps, and intensities data frames.\
+-   The average participant was only "very active" intensity for 21.16 minutes per day, with most active minutes being "lightly active" intensity, averaging at 192.8 minutes per day.
+-   39.17 minutes was the average time participants spent laying awake while in bed
+-   Although so few people reported their weights, the data pool has a large span of weights. (min:116.0 max:294.3)
+
+# Merge tables for data visuals
+
+```{r warning=FALSE}
+merged_daily_data <- full_join(activity, sleep, by = "id", "date")
+
+merged_hourly_data <- merge(hourly_steps, hourly_intensities, by =c("id", "activity_hour", "hour"))
+
+```
+
+# Visualizations
+
+```{r warning=FALSE}
+
+
+ggplot(data=merged_daily_data, aes(x=total_steps, y=total_active_minutes)) +
+  geom_point() + 
+  labs(title = "Active Minutes and Total Steps", x="Total Steps", y="Total Active Minutes")  
+
+ggplot(data=merged_daily_data, aes(x=total_steps, y=total_minutes_asleep)) +
+  geom_smooth() + 
+  labs(title = "Time Asleep and Total Steps", x="Total Steps", y="Total Minutes Asleep")  
+
+  
+grouped_steps <- merged_hourly_data %>%
+  group_by(hour) %>%
+  drop_na() %>%
+  summarise(mean_total_steps = mean(step_total))
+
+ggplot(data=grouped_steps, aes(x=hour, y=mean_total_steps)) +
+  geom_histogram(stat= "identity", fill="blue") +
+  geom_bar(data=subset(grouped_steps, mean_total_steps==min(mean_total_steps)), aes(hour, mean_total_steps),
+           fill="red", stat="identity") +
+  geom_bar(data=subset(grouped_steps, mean_total_steps==max(mean_total_steps)), aes(hour, mean_total_steps),
+           fill="green", stat="identity") +
+  labs(title= "Average Steps by Hour", subtitle="Highlighting the peak active times",x= "Time", y= "Average Steps")
+
+
+
+grouped_intensity <- merged_hourly_data %>%
+  group_by(hour) %>%
+  drop_na() %>%
+  summarise(mean_total_intensity = mean(total_intensity))
+ggplot(data=grouped_intensity, aes(x=hour, y=mean_total_intensity)) +
+  geom_histogram(stat= "identity", fill ="blue") +
+  geom_bar(data=subset(grouped_intensity, mean_total_intensity==min(mean_total_intensity)), aes(hour, mean_total_intensity),
+           fill="red", stat="identity") +
+  geom_bar(data=subset(grouped_intensity, mean_total_intensity==max(mean_total_intensity)), aes(hour, mean_total_intensity),
+           fill="green", stat="identity") +
+  labs(title= "Average Itensity by Hour", x= "Time", y= "Average Intensity")  
+
+ggplot(data=merged_hourly_data, aes(x=total_intensity, y=average_intensity, color= hour)) +
+  geom_col() +
+  labs(title= "Average Intensity Influence on Total Intensity", subtitle= "Measuring stamina at different intensity levels", x="Total Intensity", y="Average Intensity")
+
+```
+
+# Insights from data visuals
+
+-   Most participants were active in the afternoon/evening times, with 6 pm being the most popular.
+-   While the relationship between active minutes and total steps is as expected, the relationship between time asleep and total steps is less linear with those with more steps spending less time asleep than those with less steps.
+-   People who had a higher average intensity had less stamina and overall intensity than those who were able to do less intense workouts for a longer period of time.
+
+# Final Reccomendations for Bellabeat
+
+![](https://www.ringspo.com/wp-content/uploads/2015/09/active-women-preview.jpg)
+
+### \* Create a reminder in the app to make small movements throughout the day!
+
+-   Those who have steady intensity throughout the day end up with higher step counts than those who have one big workout session and go all out.
+-   With the customer being sedentary for an average of 991.2 minutes (\~16.5 hours) a little reminder to keep moving can alleviate that.
+
+### \* Create a reminder in the app to enter daily weight in the morning.
+
+-   This encourages customers to interact with the app during hours with less activity
+-   It also encourages weight recording, which has very low participants
+
+# **Marketing Strategy**
+
+Bellabeat is about beauty from the inside and out. Women are busy with life, and sometimes our own well-being gets lost in the chaos. Bellabeat is here to remind you to take a minute to yourself. While a lot of people make time for a workout, we forget the importance of making small movements throughout the day. With small reminders, Bellabeat can pull you from the chaos or break up the sedentary monotony, and give you a gentle nudge to take movement breaks. Women juggle enough, let us take a few items off your plate!
